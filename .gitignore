@@ -1,0 +1,9 @@
+# Ignore all virtual environment files and directories
+data/
+
+# Explicitly ignore virtual environment directories and files
+bin/
+include/
+lib/
+lib64/
+pyvenv.cfg
