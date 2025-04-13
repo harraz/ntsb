@@ -15,7 +15,7 @@ def load_data(json_file_path, sample_size=1000):
     except ValueError:
         df = pd.read_json(json_file_path)
         
-    df = df.sample(sample_size)
+    # df = df.sample(sample_size)
     docs = df["ProbableCause"].dropna().tolist()
     return df, docs
 
@@ -38,7 +38,7 @@ def build_representation_model(custom_prompt, nr_docs=10, delay=2):
     )
     return representation_model
 
-def build_vectorizer(ngram_range=(1, 10)):
+def build_vectorizer(ngram_range=(1, 20)):
     """
     Creates and returns a custom CountVectorizer with the specified ngram range and English stop words.
     """
@@ -48,7 +48,7 @@ def build_vectorizer(ngram_range=(1, 10)):
 def main():
     # Load your JSON data
     json_file = "data/36f447ca-9895-422b-a9ff-5c0516513f95AviationData.json"
-    df, docs = load_data(json_file, sample_size=1000)
+    df, docs = load_data(json_file, sample_size=2000)
     
     # Define your custom prompt
     custom_prompt = """
@@ -66,14 +66,18 @@ def main():
     - Runway Issues
     - Environmental Factors
     - Flight Training Error
+    - Wildlife Collision
+    - Medical Conidition
     - Other
 
     Guidelines:
     - If the text indicates that the accident is related to inadequate pilot actions *and* shows evidence of delayed or inadequate remedial action from the flight instructor, label the topic as **Flight Training Error**.
-    - If the issue is solely due to pilot error, use **Pilot Error** or **Student Pilot** as appropriate.
+    - If the issue is solely due to pilot error, use **Pilot Error**
+    - If the issue mentions a student, label as **Student Pilot**
     - For cases where contamination or part failure is the main issue, label as **Mechanical Issues**.
+    - If the issue constains or mentions wildlife or animals, label as **Wildlife Collision**
     - Do not mix more than one label; choose the one that best represents the dominant contributing factor.
-    - Keep the label short (3-4 words maximum) with no extra explanation.
+    - Keep the label short (3-5 words maximum) with no extra explanation.
 
     Output format:
     topic: <label>
@@ -83,7 +87,7 @@ def main():
     representation_model = build_representation_model(custom_prompt, nr_docs=10, delay=2)
     
     # Build a custom vectorizer to capture technical phrases (using a wide ngram range)
-    vectorizer_model = build_vectorizer(ngram_range=(1, 10))
+    vectorizer_model = build_vectorizer(ngram_range=(1, 2))
     
     # Instantiate BERTopic with both the custom vectorizer and the OpenAI representation model
     topic_model = BERTopic(
