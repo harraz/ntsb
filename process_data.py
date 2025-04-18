@@ -16,7 +16,7 @@ def load_data(json_file_path, sample_size=1000):
         df = pd.read_json(json_file_path)
         
     # df = df.sample(sample_size)
-    docs = df["ProbableCause"].dropna().tolist()
+    docs = df["AnalysisNarrative"].dropna().tolist()
     return df, docs
 
 def build_representation_model(custom_prompt, nr_docs=10, delay=2):
@@ -38,7 +38,7 @@ def build_representation_model(custom_prompt, nr_docs=10, delay=2):
     )
     return representation_model
 
-def build_vectorizer(ngram_range=(1, 20)):
+def build_vectorizer(ngram_range=(1, 30)):
     """
     Creates and returns a custom CountVectorizer with the specified ngram range and English stop words.
     """
@@ -59,7 +59,10 @@ def main():
     Your task:
     1. Carefully review the keywords and sample documents.
     2. Identify the dominant contributing factor for the accidents described.
-    3. Choose exactly one label from the following options:
+    Guidelines:
+    - Do not mix more than one label; choose the one that best represents the dominant contributing factor.
+    - Keep the label short (3-5 words maximum) with no extra explanation.
+    - Use the following labels:
     - Pilot Error
     - Student Pilot
     - Mechanical Issues
@@ -67,27 +70,41 @@ def main():
     - Environmental Factors
     - Flight Training Error
     - Wildlife Collision
-    - Medical Conidition
+    - Medical Condition
     - Other
-
-    Guidelines:
-    - If the text indicates that the accident is related to inadequate pilot actions *and* shows evidence of delayed or inadequate remedial action from the flight instructor, label the topic as **Flight Training Error**.
-    - If the issue is solely due to pilot error, use **Pilot Error**
-    - If the issue mentions a student, label as **Student Pilot**
-    - For cases where contamination or part failure is the main issue, label as **Mechanical Issues**.
-    - If the issue constains or mentions wildlife or animals, label as **Wildlife Collision**
-    - Do not mix more than one label; choose the one that best represents the dominant contributing factor.
-    - Keep the label short (3-5 words maximum) with no extra explanation.
-
+    
     Output format:
     topic: <label>
     """
     
-    # Build the OpenAI representation model with the custom prompt
-    representation_model = build_representation_model(custom_prompt, nr_docs=10, delay=2)
+
+    # 3. If pilot or subordinate actions are involved, label them as **Pilot Error** or **Flight Training Error**.
+    # 4. If the issue is solely due to pilot error, use **Pilot Error**.
+    # 5. If the issue mentions a student, label as **Student Pilot**.
+    # 6. For cases where contamination or part failure is the main issue, label as **Mechanical Issues**.
+    # 7. If the issue contains or mentions wildlife or animals, label as **Wildlife Collision**.
+
+    # 3. Choose exactly one label from the following options:
+    # - Pilot Error
+    # - Student Pilot
+    # - Mechanical Issues
+    # - Runway Issues
+    # - Environmental Factors
+    # - Flight Training Error
+    # - Wildlife Collision
+    # - Medical Conidition
+    # - Other
+    #     - If the text indicates that the accident is related to inadequate pilot actions *and* shows evidence of delayed or inadequate remedial action from the flight instructor, label the topic as **Flight Training Error**.
+    # - If the issue is solely due to pilot error, use **Pilot Error**
+    # - If the issue mentions a student, label as **Student Pilot**
+    # - For cases where contamination or part failure is the main issue, label as **Mechanical Issues**.
+    # - If the issue constains or mentions wildlife or animals, label as **Wildlife Collision**
+    # # Build the OpenAI representation model with the custom prompt
+
+    representation_model = build_representation_model(custom_prompt, nr_docs=100, delay=2)
     
     # Build a custom vectorizer to capture technical phrases (using a wide ngram range)
-    vectorizer_model = build_vectorizer(ngram_range=(1, 2))
+    vectorizer_model = build_vectorizer(ngram_range=(1, 30))
     
     # Instantiate BERTopic with both the custom vectorizer and the OpenAI representation model
     topic_model = BERTopic(
@@ -106,14 +123,14 @@ def main():
     print(topic_info.head())
     
     # Map topic labels back onto the original DataFrame
-    filtered = df[df["ProbableCause"].notna()].reset_index(drop=True)
+    filtered = df[df["AnalysisNarrative"].notna()].reset_index(drop=True)
     filtered["TopicID"] = topics
     filtered["TopicName"] = filtered["TopicID"].map(
         dict(zip(topic_info.Topic, topic_info.Name))
     )
     
     print("Sample of Labeled Documents:")
-    print(filtered[["ProbableCause", "TopicID", "TopicName"]].head(200))
+    print(filtered[["AnalysisNarrative", "TopicID", "TopicName"]].head(5))
     
     # Save the processed DataFrame to a CSV file
     filtered.to_csv("data/processed_aviation_data.csv", index=False)
