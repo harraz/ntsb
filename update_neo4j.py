@@ -14,6 +14,12 @@ print("Clearing existing graph data...")
 graph.run("MATCH (n) DETACH DELETE n")
 print("Graph data cleared.")
 
+# 2. Ensure uniqueness on TopicName
+try:
+    graph.schema.create_uniqueness_constraint("Topic", "TopicName")
+except Exception:
+    pass  # constraint already exists
+
 # -------------------------------------------
 # 3. Load CSV Data from File
 # -------------------------------------------
@@ -43,16 +49,34 @@ for idx, row in df.iterrows():
     graph.run(accident_query, accident_params)
 
     # --- Create or Merge the Topic Node (Probable Cause Label) ---
+    # topic_query = """
+    # MATCH (a:Accident {Oid: $oid})
+    # MERGE (t:Topic {TopicID: $topicId})
+    #   SET t.TopicName = $topicName
+    # MERGE (a)-[:HAS_PROBABLE_CAUSE]->(t)
+    # """
+
+    # topic_params = {
+    #     "oid": row["Oid"],
+    #     "topicId": row["TopicID"],
+    #     "topicName": row["TopicName"].split("_", 1)[1] if "_" in row["TopicName"] else row["TopicName"]
+    # }
+    # graph.run(topic_query, topic_params)
+
     topic_query = """
     MATCH (a:Accident {Oid: $oid})
-    MERGE (t:Topic {TopicID: $topicId})
-      SET t.TopicName = $topicName
+    MERGE (t:Topic {TopicName: $topicName})
+    ON CREATE SET t.TopicIDs = [$topicId]
+    ON MATCH SET t.TopicIDs = CASE
+        WHEN NOT $topicId IN t.TopicIDs THEN t.TopicIDs + $topicId
+        ELSE t.TopicIDs
+    END
     MERGE (a)-[:HAS_PROBABLE_CAUSE]->(t)
     """
     topic_params = {
         "oid": row["Oid"],
         "topicId": row["TopicID"],
-        "topicName": row["TopicName"]
+        "topicName": row["TopicName"].split("_", 1)[1] if "_" in row["TopicName"] else row["TopicName"]
     }
     graph.run(topic_query, topic_params)
 
